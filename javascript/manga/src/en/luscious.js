@@ -6,7 +6,7 @@ const mangayomiSources = [{
     "iconUrl": "https://www.luscious.net/favicon.ico",
     "typeSource": "single",
     "itemType": 0,
-    "version": "1.0.0",
+    "version": "1.1.0",
     "isNsfw": true,
     "sourceCodeUrl": "https://raw.githubusercontent.com/kingsiruss/mangayomi-extensions/main/javascript/manga/src/en/luscious.js",
     "sourceCodeLanguage": 1
@@ -21,6 +21,11 @@ class DefaultExtension extends MProvider {
             "Accept": "application/json",
             "Origin": "https://members.luscious.net"
         };
+    }
+
+    isGif(url) {
+        if (!url) return false;
+        return url.toLowerCase().includes(".gif");
     }
 
     isImageUrl(url) {
@@ -154,12 +159,22 @@ class DefaultExtension extends MProvider {
             for (const p of items) {
                 let img = null;
 
-                if (p.is_animated && this.isImageUrl(p.url_to_original)) {
-                    img = p.url_to_original;
-                } else if (this.isImageUrl(p.url_to_original)) {
-                    img = p.url_to_original;
-                } else if (p.thumbnails && p.thumbnails.length > 0 && this.isImageUrl(p.thumbnails[0].url)) {
-                    img = p.thumbnails[0].url;
+                // Strong preference for actual GIF when the item is animated
+                if (p.is_animated) {
+                    if (this.isGif(p.url_to_original)) {
+                        img = p.url_to_original;
+                    } else if (p.thumbnails) {
+                        const gifThumb = p.thumbnails.find(t => this.isGif(t.url));
+                        if (gifThumb) img = gifThumb.url;
+                    }
+                    // Last resort: original even if not .gif (some animated stills)
+                    if (!img && p.url_to_original) img = p.url_to_original;
+                } else {
+                    if (this.isImageUrl(p.url_to_original)) {
+                        img = p.url_to_original;
+                    } else if (p.thumbnails && p.thumbnails.length > 0) {
+                        img = p.thumbnails[0].url;
+                    }
                 }
 
                 if (img) allPages.push(img);
