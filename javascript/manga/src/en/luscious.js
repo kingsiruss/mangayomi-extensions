@@ -6,7 +6,7 @@ const mangayomiSources = [{
     "iconUrl": "https://www.luscious.net/favicon.ico",
     "typeSource": "single",
     "itemType": 0,
-    "version": "1.1.0",
+    "version": "1.2.0",
     "isNsfw": true,
     "sourceCodeUrl": "https://raw.githubusercontent.com/kingsiruss/mangayomi-extensions/main/javascript/manga/src/en/luscious.js",
     "sourceCodeLanguage": 1
@@ -21,18 +21,6 @@ class DefaultExtension extends MProvider {
             "Accept": "application/json",
             "Origin": "https://members.luscious.net"
         };
-    }
-
-    isGif(url) {
-        if (!url) return false;
-        return url.toLowerCase().includes(".gif");
-    }
-
-    isImageUrl(url) {
-        if (!url) return false;
-        const lower = url.toLowerCase();
-        return lower.includes(".gif") || lower.includes(".jpg") || lower.includes(".jpeg") || 
-               lower.includes(".png") || lower.includes(".webp") || lower.includes(".avif");
     }
 
     async graphql(operationName, variables = {}) {
@@ -55,6 +43,7 @@ class DefaultExtension extends MProvider {
                             url_to_original 
                             url_to_video
                             is_animated
+                            thumbnail
                             thumbnails { url }
                         }
                         info { has_next_page page total_pages total_items }
@@ -157,26 +146,11 @@ class DefaultExtension extends MProvider {
             const items = list.items || [];
 
             for (const p of items) {
-                let img = null;
-
-                // Strong preference for actual GIF when the item is animated
-                if (p.is_animated) {
-                    if (this.isGif(p.url_to_original)) {
-                        img = p.url_to_original;
-                    } else if (p.thumbnails) {
-                        const gifThumb = p.thumbnails.find(t => this.isGif(t.url));
-                        if (gifThumb) img = gifThumb.url;
-                    }
-                    // Last resort: original even if not .gif (some animated stills)
-                    if (!img && p.url_to_original) img = p.url_to_original;
-                } else {
-                    if (this.isImageUrl(p.url_to_original)) {
-                        img = p.url_to_original;
-                    } else if (p.thumbnails && p.thumbnails.length > 0) {
-                        img = p.thumbnails[0].url;
-                    }
+                // gallery-dl gif=True logic: prefer url_to_original (GIF) over url_to_video (MP4)
+                let img = p.url_to_original || p.url_to_video || p.thumbnail;
+                if (!img && p.thumbnails && p.thumbnails.length > 0) {
+                    img = p.thumbnails[0].url;
                 }
-
                 if (img) allPages.push(img);
             }
 
